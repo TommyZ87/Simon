@@ -2,14 +2,12 @@ package com.example.thomas.simon;
 
 import android.content.Context;
 import android.graphics.Color;
-import android.graphics.PorterDuff;
-import android.graphics.drawable.Drawable;
-import android.graphics.drawable.ShapeDrawable;
 import android.os.Handler;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.Random;
@@ -19,24 +17,55 @@ import java.util.Random;
  */
 public class SimonGame
 {
-    ArrayList<Integer> moves = new ArrayList<>();
-    Random random = new Random();
-    Button[] buttons = new Button[4];
-    int currentMove = 0;
-    boolean humanTurn = false;
-    Handler handler;
+    private ArrayList<Integer> moves = new ArrayList<>();
+    private Random random = new Random();
+    private Button[] buttons = new Button[4];
+    private int currentMove = 0;
+    private boolean humanTurn = false;
+    private Handler handler;
+
+    private TextView scoreDisplay;
+    private TextView roundDisplay;
+    private TextView highscoreDisplay;
+
+    private int score;
+    private int round;
+
+
     SimonGame(Button[] buttons, Context context)
+    {
+        constructor(buttons, context, null, null, null);
+    }
+
+    SimonGame(Button[] buttons, Context context, TextView scoreDisplay, TextView roundDisplay, TextView highScoreDisplay)
+    {
+        constructor(buttons, context, scoreDisplay, roundDisplay, highScoreDisplay);
+    }
+
+    private void constructor(Button[] buttons, Context context, TextView scoreDisplay, TextView roundDisplay, TextView highScoreDisplay)
     {
         this.buttons=buttons;
         handler = new Handler(context.getMainLooper());
-//        addButtonListeners();
         setButtonsOnTouch();
+        this.scoreDisplay = scoreDisplay;
+        this.roundDisplay = roundDisplay;
+        this.highscoreDisplay = highScoreDisplay;
+    }
+
+    public void reset()
+    {
+        moves.clear();
+        score = 0;
+        currentMove=0;
+        round = 0;
+
     }
 
     public void round()
     {
         Log.v("ROUND", "ROUND STARTED");
         currentMove=0;
+        updateRound();
         generateMove();
         playBack();
     }
@@ -51,29 +80,19 @@ public class SimonGame
         new Thread(new Runnable() {
             @Override
             public void run() {
+                int highlightTime = 1000;
                 humanTurn=false;
                 setButtonsEnabled(humanTurn);
                 for(final Integer move: moves)
                 {
-                    Log.v("ROUND", move + "");
-                    handler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            highlight(move);
-                        }
-                    });
-                    int highlightTime = 1000;
+                    highlight(move);
                     pause(highlightTime);
-                    handler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            unHighlight(move);
-                        }
-                    });
+                    unHighlight(move);
                     pause(highlightTime/5);
-                    humanTurn=true;
-                    setButtonsEnabled(humanTurn);
+
                 }
+                humanTurn=true;
+                setButtonsEnabled(humanTurn);
             }
         }).start();
     }
@@ -98,38 +117,62 @@ public class SimonGame
     final private static int[] unhighlightColors = {g1,r1,y1,b1};
     final private static int[] highlightColors = {g2,r2,y2,b2};
 
-    public void highlight(int index)
+    public void highlight(final int index)
     {
-        Log.v("HOUND","HIGHLIGHT" + index);
-        buttons[index].setBackgroundColor(highlightColors[index]);
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                buttons[index].setBackgroundColor(highlightColors[index]);
+            }
+        });
     }
 
-    public void unHighlight(int index)
+    public void unHighlight(final int index)
     {
-        Log.v("HOUND","UNHIGHLIGHT" + index);
-        buttons[index].setBackgroundColor(unhighlightColors[index]);
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                buttons[index].setBackgroundColor(unhighlightColors[index]);
+            }
+        });
     }
 
-    public void setButtonsEnabled(boolean enabled)
+    public void setButtonsEnabled(final boolean enabled)
     {
-        enabled = true;
-        for(Button button: buttons)
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                for(Button button: buttons)
+                {
+                    button.setEnabled(enabled);
+                }
+            }
+        });
+    }
+
+    public void updateScore()
+    {
+        score++;
+        if(scoreDisplay!=null)
         {
-            button.setEnabled(enabled);
+            handler.post(new Runnable() {
+                @Override
+                public void run() {
+                    scoreDisplay.setText(score+"");
+                }
+            });
         }
     }
 
-    public void addButtonListeners()
+    public void updateRound()
     {
-        for(int i = 0; i<buttons.length;i++)
+        round++;
+        if(roundDisplay!=null)
         {
-            final int q = i;
-
-            buttons[i].setOnClickListener(new View.OnClickListener() {
+            handler.post(new Runnable() {
                 @Override
-                public void onClick(View v)
-                {
-
+                public void run() {
+                    roundDisplay.setText(round+"");
                 }
             });
         }
@@ -143,18 +186,15 @@ public class SimonGame
             buttons[i].setOnTouchListener(new View.OnTouchListener() {
                 @Override
                 public boolean onTouch(View v, MotionEvent event) {
-                    Log.v("TOUCH", "TOUCH" + q);
                     switch (event.getAction()) {
                         case MotionEvent.ACTION_DOWN:
                             // PRESSED
                             highlight(q);
-//                            buttons[q].setBackgroundColor(highlightColors[q]);
                             return true; // if you want to handle the touch event
                         case MotionEvent.ACTION_UP:
                             // RELEASED
                             unHighlight(q);
                             click(q);
-//                            buttons[q].setBackgroundColor(unhighlightColors[q]);
                             return true; // if you want to handle the touch event
                     }
                     return true;
@@ -165,12 +205,12 @@ public class SimonGame
 
     public void click(int q)
     {
-        Log.v("TOUCH","CLICK" + q);
         if(humanTurn)
         {
             if(moves.get(currentMove)==q)
             {
                 currentMove++;
+                updateScore();
                 if(currentMove>=moves.size())
                 {
                     round();
@@ -178,18 +218,9 @@ public class SimonGame
             }
             else
             {
+                //TODO
                 Log.v("GAMESTATE", "YOU LOSE");
             }
         }
-    }
-
-        boolean highlight = false;
-    private void testClick(int q)
-    {
-        if(highlight)
-            unHighlight(q);
-        else
-            highlight(q);
-        highlight = !highlight;
     }
 }
